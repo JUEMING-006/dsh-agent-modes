@@ -26,30 +26,47 @@ DeepSeek Harness (dsh) 插件：**模式化的多智能体编队**。选择一�
 - **额度可见**：每次 API 调用按角色记账（token 与美元），横条/看板实时显示，支持月度预算拦截。
 - **UI**：界面底部横状条，点击展开面板（角色改模型、切模式、看花费）；另有浏览器看板兜底 `http://127.0.0.1:3117`。
 
-## 安装
+## 安装（其他用户看这里）
 
-### 形态一：CLI / 本地（`npx @deepseek-ai/dsh web`）
+前提：已安装 DeepSeek Harness（桌面安装包，或装好 Node.js 后用 `npx @deepseek-ai/dsh web`）。插件**零运行时依赖、零构建**，装完重启 dsh 即用。
+
+### 方式 A：GitHub 直装（推荐，CLI）
 
 ```bash
-# 方式 A：从本地目录安装（推荐先用这个）
-dsh plugin --profile default add C:/path/to/dsh-agent-modes
-
-# 方式 B：npm 包 / GitHub
-dsh plugin --profile default add ./dsh-agent-modes-1.0.0.tgz
+dsh plugin --profile default add github:JUEMING-006/dsh-agent-modes
 ```
 
-开发调试（热加载源码）：
+### 方式 B：桌面应用插件面板
+
+桌面应用 → 插件 → Add → 填入 GitHub 地址 `JUEMING-006/dsh-agent-modes`，或选择本地下载的 tarball。
+
+### 方式 C：Release tarball（CLI / 面板通用）
+
+1. 到 [Releases](https://github.com/JUEMING-006/dsh-agent-modes/releases) 下载 `dsh-agent-modes-x.y.z.tgz`
+2. `dsh plugin --profile default add <下载路径>.tgz`
+
+### 方式 D：本地目录（开发者）
+
+```bash
+git clone https://github.com/JUEMING-006/dsh-agent-modes
+dsh plugin --profile default add ./dsh-agent-modes
+```
+
+### 安装后
+
+1. **重启 dsh / 桌面应用**（插件在启动时加载）；
+2. 界面底部出现"编队"悬浮条 → 点击展开 → 首次使用会按你 dsh 设置里的模型自动生成初始编队；
+3. 在插件配置里填 API Key（仅 dsh 未配置的 provider 需要；或开 `mock.enabled` 零 Key 自测）。
+
+### 开发调试（热加载源码）
 
 ```bash
 dsh web --patch ./examples/dev.patch.yml   # 先把 dev.patch.yml 里的路径改成绝对路径
 ```
 
-### 形态二：桌面应用安装包（Windows .exe / macOS .dmg）
+### 补充：手动装进桌面 profile（面板不可用时的兜底）
 
-桌面 profile 由 Electron 应用独占管理（CLI 操作它会报 `profile "desktop" is managed exclusively by the Electron application`）。两条路：
-
-1. **推荐**：桌面版内 Plugins 面板 → Add → 选本地目录或 tarball；
-2. **手动**（本机已验证可用）：把 tarball `pnpm add` 进 `%USERPROFILE%\.dsh\profiles\desktop`，并把 `"dsh-agent-modes"` 加入该 `package.json` 的 `dsh.profile.bundles` 数组，然后**重启桌面应用**。
+桌面 profile 由 Electron 应用独占管理（CLI 操作它会报 `profile "desktop" is managed exclusively by the Electron application`）。面板 Add 不可用时：把 tarball `pnpm add` 进 `%USERPROFILE%\.dsh\profiles\desktop`，并把 `"dsh-agent-modes"` 加入该 `package.json` 的 `dsh.profile.bundles` 数组，然后**重启桌面应用**（本机已验证可用）。
 
 ### 配置 API Key
 
