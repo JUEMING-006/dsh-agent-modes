@@ -14,7 +14,8 @@ await build({
   outfile: 'lib/index.js',
   format: 'esm',
   platform: 'node',
-  external: ['@deepseek-ai/*', 'node:*'],
+  // schemastery 一并打包：lib 完全自包含，任何安装方式（github:/tarball/目录）都不再装运行时依赖
+  external: ['node:*'],
   jsx: 'automatic',
   ...(watch ? { watch: true } : {}),
 })
