@@ -1,54 +1,8 @@
 import type { AgentModesConfig } from './config'
+import type { DshProviderModels } from './dshllm'
 import type { ModeDefinition, RuntimeState, WorkerSpec } from './types'
 
-export const BUILT_IN_MODES: ModeDefinition[] = [
-  {
-    id: 'gpt-lead',
-    name: 'GPT 主控模式',
-    description: '主控 GPT-5.1，执行 GPT-5-mini + Gemini Flash-Lite，DeepSeek 验证收尾',
-    lead: { provider: 'openai', model: 'gpt-5.1' },
-    leadSource: 'session',
-    workers: [
-      { role: '通用执行', provider: 'openai', model: 'gpt-5-mini', note: '均衡的通用子任务' },
-      { role: '廉价批量', provider: 'google', model: 'gemini-2.5-flash-lite', note: '大批量、低价值密度的子任务' },
-    ],
-    verifier: { provider: 'deepseek', model: 'deepseek-v4-pro' },
-    memory: { shared: true, digestMaxChars: 6000 },
-    budget: { monthlyCapUsd: 20, onExceed: 'warn' },
-    enforceSubagents: true,
-  },
-  {
-    id: 'deepseek-lead',
-    name: 'DeepSeek 主控模式（省钱）',
-    description: '主控 DeepSeek-V4-Pro，执行全用最便宜的模型，DeepSeek-Flash 验证',
-    lead: { provider: 'deepseek', model: 'deepseek-v4-pro' },
-    leadSource: 'session',
-    workers: [
-      { role: '通用执行', provider: 'deepseek', model: 'deepseek-flash', note: 'DeepSeek 轻量档' },
-      { role: '廉价批量', provider: 'google', model: 'gemini-2.5-flash-lite' },
-    ],
-    verifier: { provider: 'deepseek', model: 'deepseek-flash' },
-    memory: { shared: true, digestMaxChars: 6000 },
-    budget: { monthlyCapUsd: 10, onExceed: 'warn' },
-    enforceSubagents: true,
-  },
-  {
-    id: 'mini-max-mix',
-    name: 'MiniMax 混编模式',
-    description: '主控 GPT-5.1，MiniMax-M3 承担重执行，Nano 做轻执行，DeepSeek 验证',
-    lead: { provider: 'openai', model: 'gpt-5.1' },
-    leadSource: 'session',
-    workers: [
-      { role: '重执行', provider: 'minimax', model: 'MiniMax-M3', note: '长文与复杂改写' },
-      { role: '轻执行', provider: 'openai', model: 'gpt-5-nano', note: '格式化、抽取、分类' },
-    ],
-    verifier: { provider: 'deepseek', model: 'deepseek-v4-pro' },
-    memory: { shared: true, digestMaxChars: 6000 },
-    budget: { monthlyCapUsd: 15, onExceed: 'warn' },
-    enforceSubagents: true,
-  },
-]
-
+/** 模拟自测模式：仅在 config.mock.enabled 时出现，不占用户模式位 */
 export const MOCK_MODE: ModeDefinition = {
   id: 'mock-test',
   name: '模拟自测模式（零 API）',
@@ -65,43 +19,95 @@ export const MOCK_MODE: ModeDefinition = {
   enforceSubagents: true,
 }
 
-/** 模式合并：内置 + 用户配置（同 id 覆盖）+ 运行时角色覆盖 */
-export class ModeRegistry {
-  private activeId: string
-  private roleOverrides: Record<string, { provider: string; model: string }> = {}
-  private modes = new Map<string, ModeDefinition>()
+export interface PersistData {
+  activeModeId: string
+  savedModes: ModeDefinition[]
+}
 
-  constructor(private config: AgentModesConfig, private persist: (data: PersistData) => void, saved?: PersistData) {
-    this.reload()
-    this.activeId = saved?.activeModeId || config.activeMode || 'gpt-lead'
-    this.roleOverrides = saved?.roleOverrides ?? {}
-    if (!this.modes.has(this.activeId)) this.activeId = this.modes.keys().next().value ?? 'gpt-lead'
+const PLACEHOLDER_ID = 'custom'
+
+function placeholderMode(): ModeDefinition {
+  return {
+    id: PLACEHOLDER_ID,
+    name: '我的编队',
+    description: '首次使用自动生成，展开面板挑选模型后保存即可',
+    lead: { provider: 'deepseek', model: 'deepseek-chat' },
+    leadSource: 'session',
+    workers: [{ role: '通用执行', provider: 'deepseek', model: 'deepseek-chat', note: '通用子任务' }],
+    verifier: { provider: 'deepseek', model: 'deepseek-chat' },
+    memory: { shared: true, digestMaxChars: 6000 },
+    budget: { monthlyCapUsd: 0, onExceed: 'warn' },
+    enforceSubagents: true,
+  }
+}
+
+const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-').replace(/^-+|-+$/g, '') || 'mode'
+
+/**
+ * 模式注册器：没有内置预设。
+ * 模式来源 = 用户在面板里保存的（saved，持久化到 state.json）+ 插件配置里的（config，进阶用法）
+ * + 模拟自测（mock，仅 config.mock.enabled）。首次使用自动按 dsh 模型目录生成一份初始编队。
+ */
+export class ModeRegistry {
+  private entries = new Map<string, { mode: ModeDefinition; origin: 'saved' | 'config' | 'mock' | 'placeholder' }>()
+  private activeId = ''
+
+  constructor(private config: AgentModesConfig, private persist: (d: PersistData) => void, saved?: PersistData) {
+    if (saved?.savedModes?.length) {
+      for (const m of saved.savedModes) this.entries.set(m.id, { mode: structuredClone(m), origin: 'saved' })
+    }
+    if (this.config.mock?.enabled) this.entries.set(MOCK_MODE.id, { mode: structuredClone(MOCK_MODE), origin: 'mock' })
+    for (const m of this.config.modes ?? []) {
+      if (!this.entries.has(m.id)) this.entries.set(m.id, { mode: structuredClone(m), origin: 'config' })
+    }
+    if (this.entries.size === 0) this.entries.set(PLACEHOLDER_ID, { mode: placeholderMode(), origin: 'placeholder' })
+    this.activeId = saved?.activeModeId && this.entries.has(saved.activeModeId) ? saved.activeModeId : this.entries.keys().next().value as string
   }
 
-  reload() {
-    this.modes = new Map()
-    for (const m of BUILT_IN_MODES) this.modes.set(m.id, structuredClone(m))
-    if (this.config.mock?.enabled) this.modes.set(MOCK_MODE.id, structuredClone(MOCK_MODE))
-    for (const m of this.config.modes ?? []) this.modes.set(m.id, structuredClone(m))
+  /** dsh 模型目录就绪后，把占位编队的角色替换成用户真实配置的模型（仅一次） */
+  bootstrapFromCatalog(providers: DshProviderModels[]): ModeDefinition | null {
+    const entry = this.entries.get(this.activeId)
+    if (!entry || entry.origin !== 'placeholder') return null
+    const flat = providers.flatMap(p => p.models.map(m => ({ provider: p.id, model: m.id, name: m.name })))
+    if (!flat.length) return null
+    const pick = (want: RegExp, avoid: string) =>
+      flat.find(m => want.test(m.provider + '/' + m.model) && m.model !== avoid)?.model ?? flat.find(m => m.model !== avoid)?.model ?? flat[0].model
+    const lead = flat.find(m => /pro|smart|flash/i.test(m.model)) ?? flat[0]
+    const leadModel = pick(/pro|smart|flash/i, '')
+    const workModel = pick(/flash|mini|lite|fast/i, leadModel)
+    const verifyModel = pick(/pro|smart/i, workModel)
+    entry.mode = {
+      ...entry.mode,
+      lead: { provider: lead.provider, model: leadModel },
+      workers: [{ role: '通用执行', provider: lead.provider, model: workModel, note: '通用子任务' }],
+      verifier: { provider: lead.provider, model: verifyModel },
+    }
+    entry.origin = 'saved'
+    this.persistSaved()
+    return entry.mode
+  }
+
+  /** 占位编队待引导 */
+  needsBootstrap(): boolean {
+    return this.entries.get(this.activeId)?.origin === 'placeholder'
   }
 
   list(): ModeDefinition[] {
-    return [...this.modes.values()]
+    return [...this.entries.values()].map(x => x.mode)
   }
 
   get active(): ModeDefinition {
-    return this.modes.get(this.activeId) ?? BUILT_IN_MODES[0]
+    return (this.entries.get(this.activeId) ?? this.entries.values().next().value as { mode: ModeDefinition }).mode
   }
 
   switch(id: string): ModeDefinition {
-    if (!this.modes.has(id)) throw new Error(`模式 "${id}" 不存在。可用：${[...this.modes.keys()].join(', ')}`)
+    if (!this.entries.has(id)) throw new Error(`模式 "${id}" 不存在。可用：${[...this.entries.keys()].join(', ')}`)
     this.activeId = id
-    this.roleOverrides = {}
-    this.persist(this.snapshot())
+    this.persistSaved()
     return this.active
   }
 
-  /** 面板/工具里微调某个角色的模型（运行时覆盖，切模式后还原） */
+  /** 把当前激活模式的某角色改成指定模型（直接保存在该模式里） */
   setRole(role: string, provider: string, model: string): ModeDefinition {
     const mode = this.active
     const target =
@@ -109,9 +115,53 @@ export class ModeRegistry {
     if (!target) throw new Error(`角色 "${role}" 不存在。可用：lead, verifier, ${mode.workers.map(w => w.role).join(', ')}`)
     target.provider = provider
     target.model = model
-    this.roleOverrides[role] = { provider, model }
-    this.persist(this.snapshot())
+    this.markSaved()
+    this.persistSaved()
     return mode
+  }
+
+  /** 保存当前编队为新模式（或覆盖指定 id 的模式），并切换过去 */
+  saveMode(input: { id?: string; name: string }): ModeDefinition {
+    const current = this.active
+    const id = input.id || (this.entries.has(slug(input.name)) && this.entries.get(slug(input.name))!.mode.name === input.name ? slug(input.name) : this.uniqueSlug(input.name))
+    const mode: ModeDefinition = {
+      ...structuredClone(current),
+      id,
+      name: input.name || current.name,
+    }
+    this.entries.set(id, { mode, origin: 'saved' })
+    this.activeId = id
+    this.persistSaved()
+    return mode
+  }
+
+  removeMode(id: string): void {
+    if (this.entries.size <= 1) throw new Error('至少保留一个模式')
+    const entry = this.entries.get(id)
+    if (!entry) throw new Error(`模式 "${id}" 不存在`)
+    this.entries.delete(id)
+    if (this.activeId === id) this.activeId = this.entries.keys().next().value as string
+    this.persistSaved()
+  }
+
+  private markSaved() {
+    const e = this.entries.get(this.activeId)
+    if (e && e.origin === 'placeholder') e.origin = 'saved'
+  }
+
+  private uniqueSlug(name: string): string {
+    const base = slug(name)
+    let id = base
+    let i = 2
+    while (this.entries.has(id)) id = `${base}-${i++}`
+    return id
+  }
+
+  private persistSaved() {
+    const savedModes = [...this.entries.values()]
+      .filter(x => x.origin === 'saved')
+      .map(x => x.mode)
+    this.persist({ activeModeId: this.activeId, savedModes })
   }
 
   roles(): RuntimeState['roles'] {
@@ -122,13 +172,4 @@ export class ModeRegistry {
       { role: 'verifier', provider: mode.verifier.provider, model: mode.verifier.model, kind: 'verifier' as const },
     ]
   }
-
-  snapshot(): PersistData {
-    return { activeModeId: this.activeId, roleOverrides: this.roleOverrides }
-  }
-}
-
-export interface PersistData {
-  activeModeId: string
-  roleOverrides: Record<string, { provider: string; model: string }>
 }

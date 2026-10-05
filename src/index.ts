@@ -61,6 +61,16 @@ export function apply(ctx: Context, rawConfig: AgentModesConfig) {
 
   registerTools(ctx, { modes, gateway, ledger, memory, store, config, recentMemory: (n) => sessions.recentMemory(n) })
 
+  // 首次使用：按 dsh 设置里的真实模型目录生成初始编队（不内置任何过时预设）
+  if (modes.needsBootstrap()) {
+    void dsh.listProviderModels().then(providers => {
+      if (providers.length && modes.bootstrapFromCatalog(providers)) {
+        store.setRoles(modes.roles())
+        ctx.logger?.info?.('[agent-modes] 已按 dsh 模型目录生成初始编队，展开面板可调整并保存为你的模式')
+      }
+    }).catch(() => {})
+  }
+
   // 一切路径派发的子代理（原生 subagent 工具 / Agent teams / team_spawn）强制套用模式映射 + 异步自动验证
   if (config.verifySubagents) {
     new SubagentEnforcer(ctx, {
@@ -88,6 +98,17 @@ export function apply(ctx: Context, rawConfig: AgentModesConfig) {
     onSwitch: id => {
       const m = modes.switch(id)
       store.setActiveMode(m.id)
+      store.setRoles(modes.roles())
+      memory.clear()
+    },
+    onSaveMode: (name, id) => {
+      const m = modes.saveMode({ name, id })
+      store.setActiveMode(m.id)
+      store.setRoles(modes.roles())
+    },
+    onRemoveMode: id => {
+      modes.removeMode(id)
+      store.setActiveMode(modes.active.id)
       store.setRoles(modes.roles())
       memory.clear()
     },

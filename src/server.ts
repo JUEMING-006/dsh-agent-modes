@@ -14,6 +14,8 @@ export interface DashboardDeps {
   dsh: DshLlm
   sessions: SessionReader
   onSwitch: (id: string) => void
+  onSaveMode: (name: string, id?: string) => void
+  onRemoveMode: (id: string) => void
   onSetRole: (role: string, provider: string, model: string) => void
 }
 
@@ -84,6 +86,10 @@ export class DashboardServer {
         const body = await readBody(req)
         if (url === '/api/mode/switch') {
           this.deps.onSwitch(String(body.id))
+        } else if (url === '/api/mode/save') {
+          this.deps.onSaveMode(String(body.name || '未命名模式'), body.id ? String(body.id) : undefined)
+        } else if (url === '/api/mode/remove') {
+          this.deps.onRemoveMode(String(body.id))
         } else if (url === '/api/role') {
           this.deps.onSetRole(String(body.role), String(body.provider), String(body.model))
         } else {

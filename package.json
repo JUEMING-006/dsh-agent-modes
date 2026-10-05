@@ -1,6 +1,6 @@
 {
   "name": "dsh-agent-modes",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "智能体编队模式：主控派发 + 多模型执行 + 独立验证 + 共享记忆 + 额度看板",
   "type": "module",
   "main": "lib/index.js",

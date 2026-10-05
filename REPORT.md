@@ -183,6 +183,7 @@ UI 组件注册在渲染进程（`window.__ModuleLoader__` 约定 + `ctx.slots.i
 | 1.0.8 | 新增会话读取器：多帧 zstd 解析、会话列表/动态/真实 token；面板"会话与损耗"区 |
 | 1.0.9 | 面板逐轮显示所用模型（request/context 解析）；内置 mock 适配器+模拟自测模式；离线双路由自动化测试 |
 | 1.1.0 | **原生子代理强制映射**：包装 `ctx.subagents.start/startContinuable`，dsh 自派子代理（原生工具/Agent teams）一律套用模式模型映射并异步自动验证；**记账去美元化**：全 UI 只计 token（入/出）；**跨会话记忆映射**：`memory.injectRecentSessions` 把最近 N 个 dsh 会话摘要注入团队共享上下文（不引入 mem0，直接引用 dsh 已有记录） |
+| 1.2.0 | **去掉全部内置模式**（过时硬编码型号）：编队完全由用户保存/切换/删除；首次使用按 dsh 模型目录自动生成初始编队；面板新增"输入名称→保存为新模式"与模式删除；服务端新增 `/api/mode/save`、`/api/mode/remove`，模式持久化到 state.json |
 
 ---
 

@@ -106,6 +106,7 @@ window.__ModuleLoader__.load({
 			const [modes, setModes] = useState([]);
 			const [draft, setDraft] = useState({});
 			const [refreshing, setRefreshing] = useState(false);
+			const [newModeName, setNewModeName] = useState("");
 			const [sessions, setSessions] = useState([]);
 			const [selSession, setSelSession] = useState("");
 			const [feed, setFeed] = useState(null);
@@ -209,7 +210,20 @@ window.__ModuleLoader__.load({
 					.then(() => tick2(base, setS));
 			};
 			const switchMode = (id) => {
-				fetch(base + "/api/mode/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).then(() => tick2(base, setS));
+				fetch(base + "/api/mode/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).then(() => refreshAll(base, setS, setModes));
+			};
+			const removeMode = (id) => {
+				if (!window.confirm("删除该模式？")) return;
+				fetch(base + "/api/mode/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) })
+					.then((r) => r.json())
+					.then((res) => { if (res.error) { window.alert(res.error); return; } refreshAll(base, setS, setModes); });
+			};
+			const saveMode = () => {
+				const name = (newModeName || "").trim();
+				if (!name) { window.alert("先输入模式名称，再把当前编队保存为新模式"); return; }
+				fetch(base + "/api/mode/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) })
+					.then((r) => r.json())
+					.then((res) => { if (res.error) { window.alert(res.error); return; } setNewModeName(""); refreshAll(base, setS, setModes); });
 			};
 			const modelOptions = (r) => {
 				const current = r.provider + "::" + r.model;
@@ -298,9 +312,18 @@ window.__ModuleLoader__.load({
 									en.usage && e("span", { style: { fontSize: 10, color: C.dim } }, "入 " + en.usage.inputTokens + " · 出 " + en.usage.outputTokens)),
 									e("div", { style: { fontSize: 12, color: en.error ? C.danger : en.kind === "user" ? C.text : C.muted, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, en.text))))
 							: e("div", { style: { color: C.dim, fontSize: 11.5 } }, "该会话暂无可展示的对话/命令")),
-					e("div", { style: section }, e("span", null, "编队模式")),
+					e("div", { style: section }, e("span", null, "编队模式（点击切换，× 删除）")),
 					e("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
-						modes.map((m) => e("button", { key: m.id, style: modeBtn(m, m.id === s.activeModeId), className: "am-mode", onClick: () => switchMode(m.id) }, m.name || m.id))),
+						modes.map((m) => e("span", {
+							key: m.id,
+							className: "am-mode",
+							style: { ...modeBtn(m, m.id === s.activeModeId), display: "inline-flex", alignItems: "center", gap: 5 },
+						},
+							e("span", { onClick: () => switchMode(m.id), style: { cursor: "pointer" } }, m.name || m.id),
+							e("span", { title: "删除该模式", onClick: (ev) => { ev.stopPropagation(); removeMode(m.id); }, style: { color: m.id === s.activeModeId ? "#0d1117" : C.dim, cursor: "pointer", fontWeight: 700 } }, "×")))),
+					e("div", { style: { display: "flex", gap: 6, marginTop: 6 } },
+						e("input", { className: "am-input", placeholder: "输入名称，把当前编队保存为新模式（不同项目可各存一套）", value: newModeName, onChange: (ev) => setNewModeName(ev.target.value) }),
+						e("button", { className: "am-apply", onClick: saveMode }, "保存")),
 					e("div", { style: section }, e("span", null, "角色与模型"), e("span", { style: { color: C.dim } }, catalog?.available ? "模型来自 dsh 设置" : refreshing ? "读取模型目录中…" : "输入 provider / 模型")),
 					(s.roles || []).map((r) => {
 						const sel = draft[r.role] || { provider: r.provider, model: r.model };

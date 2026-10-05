@@ -11,7 +11,7 @@ DeepSeek Harness (dsh) 插件：**模式化的多智能体编队**。选择一�
      ↑ 不合格自动返修一轮 ←──── 验证结论 ────┘ → 汇总交付
 ```
 
-> **实机验证状态**（v1.0.3）：已在 DeepSeek 桌面应用（运行时 0.2.0-rc.2）与 CLI 宿主上验证——
+> **实机验证状态**（v1.2.0）：已在 DeepSeek 桌面应用（运行时 0.2.0-rc.2）与 CLI 宿主上验证——
 > 插件零警告激活、9 个 team_* 工具全部注册、悬浮横条在界面底部渲染并每 3 秒实时轮询、
 > 看板 http://127.0.0.1:3117 正常服务。兼容性关键点：
 > ① 本插件**不携带任何 @deepseek-ai 运行时依赖**（dsh-tools 等 npm 包版本滞后于运行时，混装会被
@@ -64,21 +64,22 @@ dsh web --patch ./examples/dev.patch.yml   # 先把 dev.patch.yml 里的路径�
 
 只填你要用到的即可；`baseUrl` 留空走官方 OpenAI 兼容端点。
 
-## 内置模式
+## 编队模式：由你保存与切换（不内置任何预设）
 
-| 模式 | 主控 | 执行 | 验证 |
-|---|---|---|---|
-| `gpt-lead` GPT 主控模式 | GPT-5.1（建议） | GPT-5-mini（通用）、Gemini-2.5-Flash-Lite（廉价批量） | DeepSeek-V4-Pro |
-| `deepseek-lead` DeepSeek 主控（省钱） | DeepSeek-V4-Pro | DeepSeek-Flash、Gemini Flash-Lite | DeepSeek-Flash |
-| `mini-max-mix` MiniMax 混编 | GPT-5.1（建议） | MiniMax-M3（重执行）、GPT-5-nano（轻执行） | DeepSeek-V4-Pro |
+插件不预置任何"过时型号"的组合——模型列表实时来自你在 **dsh 设置 → 模型** 里配置的内容：
 
-自定义模式：在插件配置的 `modes` 数组里加同结构对象（同 `id` 覆盖内置）。
+1. 首次使用：自动按你的 dsh 模型目录生成一份初始编队（主控/执行/验证各就位）；
+2. 展开面板 → 在"角色与模型"区把每个角色换成你想要的模型 → 输入名称 → **保存**，该编队进入模式列表；
+3. 不同项目各存一套（如「写代码编队」「调研编队」），点一下切换，× 删除；
+4. 进阶：也可以在插件配置的 `modes` 数组里用 JSON 定义模式（同 id 覆盖）。
+
+`mock.enabled` 打开时会出现「模拟自测模式（零 API）」用于无 Key 自测，不算预设。
 
 ## 用法（对话里说人话即可）
 
 - 「用 team_auto 把这份调研提纲做成报告」→ 自动：拆解 → 并行执行 → 验证 → 返修 → 交付
 - 「用 team_spawn 把这个子任务交给 通用执行」→ **真实子代理**（拥有 dsh 全部工具），按模式映射的模型运行，完成后自动验证
-- 「切换到 DeepSeek 主控模式」→ 调 `team_mode_switch`
+- 「切换到 XX 模式」→ 调 `team_mode_switch`（模式由你在面板里保存）
 - 「把验证员换成 gemini-2.5-flash-lite」→ 调 `team_set_role`
 - 「今天花了多少」→ 调 `team_usage`
 
