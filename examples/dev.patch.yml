@@ -1,0 +1,19 @@
+# 本地开发补丁：把下面路径改成你机器上本插件源码的绝对路径，然后：
+#   dsh web --patch ./examples/dev.patch.yml
+# 桌面版可用 设置/插件 面板安装 npm 包或本地目录（包解析规则三种形态共享）。
+- insert:
+  - id: agent-modes
+    name: 'C:/path/to/dsh-agent-modes/src/index.ts'
+    config:
+      ui:
+        enabled: true
+        dashboardPort: 3117
+      providers:
+        deepseek:
+          apiKey: '${DEEPSEEK_API_KEY}'
+        openai:
+          apiKey: '${OPENAI_API_KEY}'
+        google:
+          apiKey: '${GEMINI_API_KEY}'
+        minimax:
+          apiKey: '${MINIMAX_API_KEY}'

@@ -1,0 +1,3 @@
+- insert:
+  - id: agent-modes
+    name: dsh-agent-modes

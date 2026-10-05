@@ -1,0 +1,54 @@
+# LiteLLM 网关配置（完整版记账/预算强化，可选）
+# 启动：
+#   pip install 'litellm[proxy]'
+#   set DEEPSEEK_API_KEY=xxx  &  set OPENAI_API_KEY=xxx  &  set GEMINI_API_KEY=xxx  &  set MINIMAX_API_KEY=xxx
+#   litellm --config litellm.config.yaml --port 4141
+# 然后在插件配置里把 gateway.mode 改为 litellm 即可。
+# 网关侧自动记账、限速、虚拟 key、预算硬上限，控制台: http://0.0.0.0:4141/ui
+
+model_list:
+  # DeepSeek（OpenAI 兼容端点直连）
+  - model_name: deepseek-flash
+    litellm_params:
+      model: openai/deepseek-flash
+      api_base: https://api.deepseek.com
+      api_key: os.environ/DEEPSEEK_API_KEY
+  - model_name: deepseek-v4-pro
+    litellm_params:
+      model: openai/deepseek-v4-pro
+      api_base: https://api.deepseek.com
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  # OpenAI
+  - model_name: gpt-5.1
+    litellm_params:
+      model: openai/gpt-5.1
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: gpt-5-mini
+    litellm_params:
+      model: openai/gpt-5-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: gpt-5-nano
+    litellm_params:
+      model: openai/gpt-5-nano
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Google Gemini（OpenAI 兼容）
+  - model_name: gemini-2.5-flash-lite
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+
+  # MiniMax
+  - model_name: MiniMax-M3
+    litellm_params:
+      model: openai/MiniMax-M3
+      api_base: https://api.minimax.io/v1
+      api_key: os.environ/MINIMAX_API_KEY
+
+litellm_settings:
+  # 各家兼容层参数差异（MiniMax 忽略 penalties 等）不报错，自动丢弃
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY   # 插件 gateway.apiKey 填同一个值

@@ -1,0 +1,52 @@
+{
+  "name": "dsh-agent-modes",
+  "version": "1.1.0",
+  "description": "智能体编队模式：主控派发 + 多模型执行 + 独立验证 + 共享记忆 + 额度看板",
+  "type": "module",
+  "main": "lib/index.js",
+  "files": [
+    "lib",
+    "client",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "dev": "node build.mjs --watch"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek",
+    "multi-agent",
+    "orchestration"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "esbuild": "^0.24.0",
+    "react": "^18.3.0",
+    "typescript": "^5.6.0"
+  },
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./client/index.js",
+    "./package.json": "./package.json"
+  }
+}
